@@ -1,4 +1,4 @@
-** My devops-project **  
+#**My devops-project**  
 
 This project contain static website and Dockerfile in folder 'container'.
 An image built form this Dockerfile was uploaded to my private Amazon ECR(Elastic Container Registry).
