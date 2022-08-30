@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-project 
+  namespace: {{ .Values.nameSpace }}
+  labels:
+    app: devops-project
+spec:
+  replicas: {{ .Values.replicaCount }} 
+  selector:
+    matchLabels:
+      app: devops-project
+  template:
+    metadata:
+      labels:
+        app: devops-project 
+    spec:
+      containers:
+      - name: devops-app 
+        image: 813814720370.dkr.ecr.eu-central-1.amazonaws.com/devops-app:latest  
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 80 
+          protocol: TCP
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "200m"
+          limits:
+            memory: "400Mi"
+            cpu: "300m"
+      imagePullSecrets:
+      - name: {{ .Values.secretName }} 

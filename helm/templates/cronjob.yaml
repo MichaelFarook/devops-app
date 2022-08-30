@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecr-registry-helper-cm
+  namespace: {{ .Values.nameSpace }}
+data:
+  AWS_REGION: "eu-central-1"
+  DOCKER_SECRET_NAME: regcred
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ecr-registry-helper
+  namespace: {{ .Values.nameSpace }}  
+spec:
+  schedule: "* */10 * * *"
+  successfulJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: sa-health-check
+          containers:
+          - name: ecr-registry-helper
+            image: odaniait/aws-kubectl:latest
+            imagePullPolicy: IfNotPresent
+            envFrom:
+              - secretRef:
+                  name: ecr-registry-helper-secrets
+              - configMapRef:
+                  name: ecr-registry-helper-cm
+            command:
+              - /bin/sh
+              - -c
+              - |-
+                ECR_TOKEN=`aws ecr get-login-password --region ${AWS_REGION}`
+                NAMESPACE_NAME=devops
+                kubectl delete secret --ignore-not-found $DOCKER_SECRET_NAME -n devops
+                kubectl create secret docker-registry $DOCKER_SECRET_NAME \
+                --docker-server=https://${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com \
+                --docker-username=AWS \
+                --docker-password= $(aws ecr get-login-password) \
+                --namespace=devops
+                echo "Secret was successfully updated at $(date)"
+          restartPolicy: Never
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-health-check
+  namespace: {{ .Values.nameSpace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Values.nameSpace }}
+  name: role-full-access-to-secrets
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["regcred"]
+  verbs: ["delete"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: health-check-role-binding
+  namespace:  {{ .Values.nameSpace }}
+subjects:
+- kind: ServiceAccount
+  name: sa-health-check
+  namespace: {{ .Values.nameSpace }}
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: role-full-access-to-secrets
+  apiGroup: ""
+---
